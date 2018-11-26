@@ -1,0 +1,833 @@
+//Team 4 Bitcoin Type 1 generator
+//Group members: Biasi, Chiozzi, De Cian, Di Tizio, Zeggiotti, Alhamdan
+
+//[########] SHA256 [########]
+
+//-----------ENVIROMENT----------
+F:=GF(2);
+
+H:=["6A09E667","BB67AE85","3C6EF372","A54FF53A","510E527F","9B05688C","1F83D9AB","5BE0CD19"];
+
+K:=["428A2F98", "71374491", "B5C0FBCF", "E9B5DBA5", "3956C25B", "59F111F1", "923F82A4", "AB1C5ED5",
+"D807AA98", "12835B01", "243185BE", "550C7DC3", "72BE5D74", "80DEB1FE", "9BDC06A7", "C19BF174",
+"E49B69C1", "EFBE4786", "0FC19DC6", "240CA1CC", "2DE92C6F", "4A7484AA", "5CB0A9DC", "76F988DA",
+"983E5152", "A831C66D", "B00327C8", "BF597FC7", "C6E00BF3", "D5A79147", "06CA6351", "14292967",
+"27B70A85", "2E1B2138", "4D2C6DFC", "53380D13", "650A7354", "766A0ABB", "81C2C92E", "92722C85",
+"A2BFE8A1", "A81A664B", "C24B8B70", "C76C51A3", "D192E819", "D6990624", "F40E3585", "106AA070",
+"19A4C116", "1E376C08", "2748774C", "34B0BCB5", "391C0CB3", "4ED8AA4A", "5B9CCA4F", "682E6FF3",
+"748F82EE", "78A5636F", "84C87814", "8CC70208", "90BEFFFA", "A4506CEB", "BEF9A3F7", "C67178F2"];
+
+
+//--------SUB FUNCTIONS----------
+// FUNZIONE AND
+
+function AND (x,y)
+
+return [F!(x[i]*y[i]) : i in [1..#x]];
+end function;
+
+//FUNZIONE XOR
+
+function XOR (x,y)
+
+return [F!(x[i]+y[i]) :i in [1..#x]];
+end function;
+
+//FUNZIONE NOT
+
+function NOT (x)
+
+return [F!(x[i]+1) : i in [1..#x]];
+end function;
+
+//FUNZIONE CH
+
+function Ch (x,y,z)
+
+return (XOR (AND (x,y), AND (NOT(x),z)));
+end function;
+
+//FUNZIONE MAJ
+
+function Maj (x,y,z)
+
+return (XOR(XOR (AND(x,y),AND(x,z)), AND(y,z)));
+end function;
+
+//FUNZIONE SIGMA_ZERO
+
+function SigmaZero (x)
+
+return (XOR(XOR(Rotate(x,2), Rotate(x,13)),Rotate(x,22)));
+end function;
+
+//FUNZIONE SIGMA_UNO
+
+function SigmaUno (x)
+
+return (XOR(XOR(Rotate(x,6), Rotate(x,11)),Rotate(x,25)));
+end function;
+
+//FUNZIONE SHIFT A DESTRA
+
+function Shift (x,s)
+
+return ([F!0 : i in [1..s]] cat [x[i] : i in [1..(#x-s)]]);
+end function;
+
+//FUNZIONE SIGMA_PICCOLO_ZERO
+
+function SigmaPiccoloZero (x)
+
+return XOR(XOR(Rotate(x,7), Rotate(x,18)),Shift (x,3));
+end function;
+
+//FUNZIONE SIGMA_PICCOLO_UNO
+
+function SigmaPiccoloUno (x)
+
+return XOR(XOR(Rotate(x,17), Rotate(x,19)),Shift (x,10));
+end function;
+
+//FUNZIONE HEX_CHAR_TO_BIN
+
+function HexCharToBin (c)
+bin := [];
+	case c:
+			when "0":
+				bin := bin cat [F! 0,0,0,0];
+			when "1":
+				bin := bin cat [F! 0,0,0,1];
+			when "2":
+				bin := bin cat [F! 0,0,1,0];
+			when "3":
+				bin := bin cat [F! 0,0,1,1];
+			when "4":
+				bin := bin cat [F! 0,1,0,0];
+			when "5":
+				bin := bin cat [F! 0,1,0,1];
+			when "6":
+				bin := bin cat [F! 0,1,1,0];
+			when "7":
+				bin := bin cat [F! 0,1,1,1];
+			when "8":
+				bin := bin cat [F! 1,0,0,0];
+			when "9":
+				bin := bin cat [F! 1,0,0,1];
+			when "A":
+				bin := bin cat [F! 1,0,1,0];
+			when "B":
+				bin := bin cat [F! 1,0,1,1];
+			when "C":
+				bin := bin cat [F! 1,1,0,0];
+			when "D":
+				bin := bin cat [F! 1,1,0,1];
+			when "E":
+				bin := bin cat [F! 1,1,1,0];
+			when "F":
+				bin := bin cat [F! 1,1,1,1];
+
+	end case;
+	
+	return bin;
+end function;
+
+//FUNZIONE HEX_TO_BIN
+
+function HexToBin(h) 
+
+return (&cat[HexCharToBin(h[i]) : i in [1..#h]]);
+end function;
+
+//FUNZIONE COMPLETAMENTO A s BITS
+
+function Complete(r,s) //input r is integer number and s is the length of the sequence we want to reach
+
+r:=Reverse(Intseq(r,2)); //sequence of bits
+
+return ([F!0 : i in [1..s-#r]] cat r);
+end function;
+
+//FUNZIONE DA BINARIO A ESADECIMALE
+//b is a binary list, each bit indicates a power of 2 that increase. Conversion to base 16 requires blocks of 4
+function BinToHex(b) 
+	r := #b mod 4; 
+	d := #b div 4;
+	hex := "";
+	for i in [0..d-1] do
+		case [b[4*i+k]: k in [1..4]]:
+			when [0,0,0,0]:
+				hex := hex cat "0";
+			when [0,0,0,1]:
+				hex := hex cat "1";
+			when [0,0,1,0]:
+				hex := hex cat "2";
+			when [0,0,1,1]:
+				hex := hex cat "3";
+			when [0,1,0,0]:
+				hex := hex cat "4";
+			when [0,1,0,1]:
+				hex := hex cat "5";
+			when [0,1,1,0]:
+				hex := hex cat "6";
+			when [0,1,1,1]:
+				hex := hex cat "7";
+			when [1,0,0,0]:
+				hex := hex cat "8";
+			when [1,0,0,1]:
+				hex := hex cat "9";
+			when [1,0,1,0]:
+				hex := hex cat "A";
+			when [1,0,1,1]:
+				hex := hex cat "B";
+			when [1,1,0,0]:
+				hex := hex cat "C";
+			when [1,1,0,1]:
+				hex := hex cat "D";
+			when [1,1,1,0]:
+				hex := hex cat "E";			
+			when [1,1,1,1]:
+				hex := hex cat "F";
+		end case;
+	end for;
+	return hex;
+end function;
+
+//FUNZIONE PADDING
+
+function padding (M) //inout is a hexadecimal string
+
+M:= HexToBin(M);
+l:=#M;
+k,_:=Solution(1, 448-(l+1), 512); //Solution(a,b,n) returns a*k = b mod n e n
+
+return (M cat [F!1] cat [F!0 : i in [1..k]] cat Complete(l,64));
+
+end function;
+
+//FUNZIONE PARSING
+
+function parsing (M)
+
+return [Partition(block,32) : block in Partition(padding(M),512)]; //Partition(S,p) generates a sequence in whichi each term are sequence composed by p terms of S element each
+
+end function;
+
+
+//FUNZIONE SUM
+
+function Sum2 (u,v) //input: two sequence of bits
+Z:=Integers();
+u:=[Z!u[i] : i in [1..#u]];
+v:=[Z!v[i] : i in [1..#v]];
+
+return Complete(((Seqint(Reverse(u),2) + Seqint(Reverse(v),2))mod 2^32),32);
+end function;	
+	
+//---------PREPROCESSING------------
+
+function preprocessing (M)
+
+return (parsing(M));
+end function;
+
+//---------CONSTANT-------------
+
+k:=[HexToBin(K[i]) : i in [1..#K]];
+
+
+//---------------------MAIN FUNCTION of SHA256----------------------------------
+
+//Input: Hexdecimal string message of arbitrary length
+//Output: 256 bits in hexdecimal
+function sha(M)
+
+W:= [[F!0 : i in [1..32]]:j in [1..64]];
+M:= preprocessing(M);
+N:=#M; //N is the number of blocks
+h:= [HexToBin(H[i]) : i in [1..#H]]; //H[i]:Setting initial value
+//h is a list of lists (in binary)
+
+//The following operations have to be performed on every block from 1 to N
+
+for i in [1..N] do
+
+//------------------------MESSAGES TABLE-------------------------------
+	for t in [1..16] do 
+		W[t]:= M[i][t]; 
+	end for;
+
+	for t in [17..64] do
+		W[t]:= Sum2(Sum2(Sum2 (SigmaPiccoloUno(W[t-2]), W[t-7]),SigmaPiccoloZero(W[t-15])),W[t-16]);
+	end for;
+
+//-------------------VARIABLES INITIALIZATION---------------------------
+a:=h[1];
+b:=h[2];
+c:=h[3];
+d:=h[4];
+e:=h[5];
+f:=h[6];
+g:=h[7];
+q:=h[8];
+
+//------------------OPERATIONS BETWEEN VARIABLES-------------------------
+	for t in [1..64] do
+		T1:=Sum2(Sum2(Sum2(Sum2 (q,SigmaUno(e)),Ch(e,f,g)),k[t]),W[t]);
+		T2:=Sum2(SigmaZero(a),Maj(a,b,c));
+		q:=g;
+		g:=f;
+		f:=e;
+		e:=Sum2(d,T1);
+		d:=c;
+		c:=b;
+		b:=a;
+		a:=Sum2 (T1,T2);
+	end for;
+
+//------------------CALCULATION OF i-TH HASH VALUE-----------------------
+h[1]:= Sum2(a,h[1]);
+h[2]:= Sum2(b,h[2]);
+h[3]:= Sum2(c,h[3]);
+h[4]:= Sum2(d,h[4]);
+h[5]:= Sum2(e,h[5]);
+h[6]:= Sum2(f,h[6]);
+h[7]:= Sum2(g,h[7]);
+h[8]:= Sum2(q,h[8]);	
+
+end for;
+
+//------------------------MESSAGE DIGEST---------------------------------
+return BinToHex(h[1] cat h[2] cat h[3] cat h[4] cat h[5] cat h[6] cat h[7] cat h[8]);
+
+end function;
+
+
+//####################################################################################################################
+
+
+/*
+	[########] RIPEMD-160 [########]
+	
+	RipeMD-160 is an Hash Function that takes as input a message of arbitrary length, and outputs a sequence of 160 bits.
+	For our purposes, here, both input and output messages are converted to hexadecimal numbers.
+	We are going to give a brief explanation of how the algorithm is intended to work.
+	
+	Notation (order in a sequence representing a number).
+	
+		[i] Big-Endian: the last element on the right is the least significant (it's the canonical way to think to a number).
+		[ii] Little-Endian: the last element on the left is the least significant.
+	
+	Assumption.
+	
+		We will often need to look at hexadecimal numbers as sequences of bits (and viceversa).
+		When doing so, we are always using the function "HexToBin" (resp. "BinToHex") already implemented in "SHA256" file.
+		The convention used in "SHA256" is always Big-Endian.
+	
+	
+		[#] PADDING [#]
+	
+	The main cycle of the function needs an input sequence of 512 bits.
+	Therefore the hexadecimal message is first transformed into a sequence of bits, and then extended to the required length.
+	The padding proceeds as follows:
+	
+		[i] HexToBin(Message);
+		[ii] We append a 1 at the end of the resulting sequence;
+		[iii] We append as many 0's as necessary to get a sequence whose length is a multiple of 448;
+		[iv] We append HexToBin(length) of the original message;
+		(Up to now, everything has to be though in Big-Endian)
+		
+		[v] We reverse the order of the bits in every byte;
+		(Now the bits in each byte are Little-Endian, while everything else is in Big-Endian)
+		
+		[vi] We reverse the order of the bits in every word;
+		(Now the bits in each byte come back to be Big-Endian, the bytes in each word become Little-Endian, and the words stay Big-Endian)
+		
+		[vii] We partition the resulting sequence into words;
+		[viii] We partition the resulting sequence into t blocks of 16 words each.
+	
+	
+		[#] MAIN CYCLE [#]
+	
+	The main cycle of the function doesn't need as input the whole message, but just one 512-bit block per round.
+	Define:
+	
+		[i] Four lists r, r', s, s' of length 80 each;
+		[ii] Five non-linear functions f1, ..., f5;
+		[iii] Ten constants K1, ..., K5, K1', ..., K5';
+		[iv] Five words h0, ..., h4.
+	
+		[#] GLOBAL FUNCTION [#]
+	
+	It always starts with h0, ..., h4 initialized as in [#] MAIN CYCLE [#].
+	If the initial message has been padded to t blocks, then the algorithm performs the main cycle t times.
+	The output is the list [h0, ..., h4] after the last run of the main cycle.
+	Each h_i is a 32-bit word, that musts be converted to an hexadecimal number.
+*/
+
+
+
+//OR function
+function OR(x,y)
+	//apply De-Morgan rules starting from the AND 
+	return NOT(AND(NOT(x),NOT(y)));
+end function;
+
+//define the compression function f used into the Hash operations
+//it receives as parameters: -j: an integer between 0 and 79 that identify the portion of the function to used for the remaining input (we can see f as a sort of Piecewise linear function)
+//							 -x,y,z: are words (32 bits)
+function f(j,x,y,z)
+
+	//do a specific operation depending on the value of j
+	if j in [0..15] then
+		//x XOR y XOR z
+		return XOR(XOR(x,y),z);
+	elif j in [16..31] then
+		// (x AND y) OR (NOT(x) AND Z)
+		return OR(AND(x,y),AND(NOT(x),z));
+	elif j in [32..47] then
+		// (x OR NOT(y)) XOR z
+		return XOR(OR(x,NOT(y)),z);
+	elif j in [48..63] then
+		// (x AND z) OR (y AND NOT(z))
+		return OR(AND(x,z),AND(y,NOT(z)));
+	else //j in [64..79] 
+		// x XOR (y OR NOT(z))
+		return XOR(x,OR(y,NOT(z)));
+	end if;
+	
+end function;
+
+//function K contains the constant to use depending on the value passed as parameter
+//INPUT: -j: value in [0-79] that identify a specific constant value in hexadecimal
+//OUTPUT: an hexadecimal value that depends on the specific j value passed as parameter (that is automatically converted to an interger using 0x)
+function K(j)
+
+	//return a specific constant depending on the value of j
+	if j in [0..15] then
+		return 0x00000000;
+	elif j in [16..31] then
+		return 0x5A827999;
+	elif j in [32..47] then
+		return 0x6ED9EBA1;
+	elif j in [48..63] then
+		return 0x8F1BBCDC;
+	else //j in [64..79] 
+		return 0xA953FD4E;
+	end if;
+
+end function;
+
+//function K1 contains the constant to use depending on the value passed as parameter
+//INPUT: -j: value in [0-79] that identify a specific constant value in hexadecimal
+//OUTPUT: an hexadecimal value that depends on the specific j value passed as parameter (that is automatically converted to an interger using 0x)
+function K1(j)
+
+	//return a specific constant depending on the value of j
+	if j in [0..15] then
+		return 0x50A28BE6;
+	elif j in [16..31] then
+		return 0x5C4DD124;
+	elif j in [32..47] then
+		return 0x6D703EF3;
+	elif j in [48..63] then
+		return 0x7A6D76E9;
+	else //j in [64..79] 
+		return 0x00000000;
+	end if;
+
+end function;
+
+//define some lists that contains the index of the bits that must be access in a specific word
+r := [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, \
+7, 4, 13, 1, 10, 6, 15, 3, 12, 0, 9, 5, 2, 14, 11, 8, \
+3, 10, 14, 4, 9, 15, 8, 1, 2, 7, 0, 6, 13, 11, 5, 12, \
+1, 9, 11, 10, 0, 8, 12, 4, 13, 3, 7, 15, 14, 5, 6, 2, \
+4, 0, 5, 9, 7, 12, 2, 10, 14, 1, 3, 8, 11, 6, 15, 13];
+
+r1 := [5, 14, 7, 0, 9, 2, 11, 4, 13, 6, 15, 8, 1, 10, 3, 12, \
+6, 11, 3, 7, 0, 13, 5, 10, 14, 15, 8, 12, 4, 9, 1, 2, \
+15, 5, 1, 3, 7, 14, 6, 9, 11, 8, 12, 2, 10, 0, 4, 13, \
+8, 6, 4, 1, 3, 11, 15, 0, 5, 12, 2, 13, 9, 7, 10, 14, \
+12, 15, 10, 4, 1, 5, 8, 7, 6, 2, 13, 14, 0, 3, 9, 11];
+
+//define some lists that contains the rotate value to apply on a sequence of bits
+// NOTE: There exists no xplicit generation for s and s1
+s := [11, 14, 15, 12, 5, 8, 7, 9, 11, 13, 14, 15, 6, 7, 9, 8, \
+7, 6, 8, 13, 11, 9, 7, 15, 7, 12, 15, 9, 11, 7, 13, 12, \
+11, 13, 6, 7, 14, 9, 13, 15, 14, 8, 13, 6, 5, 12, 7, 5, \
+11, 12, 14, 15, 14, 15, 9, 8, 9, 14, 5, 6, 8, 6, 5, 12, \
+9, 15, 5, 11, 6, 8, 13, 12, 5, 12, 13, 14, 11, 8, 5, 6];
+
+s1 := [8, 9, 9, 11, 13, 15, 15, 5, 7, 7, 8, 11, 14, 14, 12, 6, \
+9, 13, 15, 7, 12, 8, 9, 11, 7, 7, 12, 7, 6, 15, 13, 11, \
+9, 7, 15, 11, 8, 6, 6, 14, 12, 13, 5, 14, 13, 13, 7, 5, \
+15, 5, 8, 11, 14, 14, 6, 14, 6, 9, 12, 9, 12, 5, 15, 8, \
+8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11];
+
+
+// INPUT:	- w: word
+//			- s: integer
+// OUTPUT:	- w^(<<< s)
+function LeftRotation(w,s)
+	return Rotate(w, #w - s);
+end function;
+
+// Next two functions are meant for the padding of the message
+// (Similar to the function "Complete" in "SHA256")
+function Complete160(n)
+	bin := Intseq(n,2);
+	while (#bin mod 8) ne 0 do
+		bin := Append(bin,0);
+	end while;
+	vector := [bin[(8*i+1)..(8*i+8)] : i in  [0..((#bin div 8)-1)]];
+	vector_final := [Reverse(vector[i]) : i in [1..#vector]];
+	bin := &cat vector_final;
+	while #bin lt 64 do
+		bin := Append(bin,0);
+	end while;
+	return bin;
+end function;
+
+// INPUT:	- M: the message, in form of an hexadecimal string
+// OUTPUT:	- a list of t 512-bit blocks, where each block is subdivided into a sequence of 16 words
+function Padding160 (M)
+	M := HexToBin(M);
+	l := #M;
+	k,_ := Solution(1, 448-(l+1), 512);
+	M := M cat [F!1] cat [F!0 : i in [1..k]] cat Complete160(l);
+	M := &cat[Reverse(byte): byte in Partition(M,8)];
+	M := [Reverse(word): word in Partition(M,32)];
+	M := Partition(M,16);
+	
+	return M;
+end function;
+
+// Sum3 is for the sum of 3 integers modulo 2^32
+// INPUT:	- u, v, w: words (to be converted into integers)
+// OUTPUT:	- u + v + w mod 2^32, in form of a 32-bit string
+function Sum3 (u,v,w)
+	Z:=Integers();
+	u:=[Z!u[i] : i in [1..#u]];
+	v:=[Z!v[i] : i in [1..#v]];
+	w:=[Z!w[i] : i in [1..#w]];
+
+	return Complete(((Seqint(Reverse(u),2) + Seqint(Reverse(v),2) + Seqint(Reverse(w),2)) mod (2^32)),32);
+end function;
+
+// Sum4 is for the sum of 4 integers modulo 2^32
+// INPUT:	- u, v, w: words (to be converted into integers)
+//			- k: an integer
+// OUTPUT:	- u + v + w mod 2^32, in form of a 32-bit string
+function Sum4 (u,v,w,k)
+	Z:=Integers();
+	u:=[Z!u[i] : i in [1..#u]];
+	v:=[Z!v[i] : i in [1..#v]];
+	w:=[Z!w[i] : i in [1..#w]];
+
+	return Complete(((Seqint(Reverse(u),2) + Seqint(Reverse(v),2) + Seqint(Reverse(w),2) + k) mod (2^32)),32);
+end function;
+
+// The following is the main routine of the Hash Function RipeMD-160
+// INPUT:	- X: the "padded" message
+//			- H: the sequence [h0 .. h4], where the hi's are 32-bits words
+//			- i: an integer (related to the i-th word of X)
+// OUTPUT:	- the updated sequence [h0 .. h4]
+function MainCycle(H,X,i)
+	
+	h0 := H[1];
+	h1 := H[2];
+	h2 := H[3];
+	h3 := H[4];
+	h4 := H[5];
+	
+	aLeft := h0;
+    bLeft := h1;
+    cLeft := h2;
+    dLeft := h3;
+    eLeft := h4;
+
+    aRight := h0;
+    bRight := h1;
+    cRight := h2;
+    dRight := h3;
+    eRight := h4;
+	
+	for j in [0..79] do
+		t := Sum2(LeftRotation(Sum4(aLeft, f(j,bLeft,cLeft,dLeft), X[i+1,r[j+1]+1], K(j)), s[j+1]), eLeft);
+		aLeft := eLeft;
+		eLeft := dLeft;
+		dLeft := LeftRotation(cLeft,10);
+		cLeft := bLeft;
+		bLeft := t;
+		
+		t := Sum2(LeftRotation(Sum4(aRight, f(79-j,bRight,cRight,dRight), X[i+1,r1[j+1]+1], K1(j)), s1[j+1]), eRight);
+		aRight := eRight;
+		eRight := dRight;
+		dRight := LeftRotation(cRight,10);
+		cRight := bRight;
+		bRight := t;
+	end for;
+	
+	t := Sum3(h1, cLeft, dRight);
+    h1 := Sum3(h2, dLeft, eRight);
+    h2 := Sum3(h3, eLeft, aRight);
+    h3 := Sum3(h4, aLeft, bRight);
+    h4 := Sum3(h0, bLeft, cRight);
+    h0 := t;
+	
+	return [h0,h1,h2,h3,h4];
+end function;
+
+// A list of functions meant to reorder the "&cat(output)" of MainCycle
+// xINy reverses the order of the x's in every y
+
+// BITS IN A BYTE
+function BitsInByte(H)
+	return &cat[Reverse(byte): byte in Partition(H,8)];
+end function;
+
+// BYTES IN A WORD
+function BytesInWord(H)
+	return &cat[&cat(Reverse(Partition(word,8))): word in Partition(H,32)];
+end function;
+
+// WORDS IN THE DIGEST
+function WordsInDigest(H)
+	return &cat(Reverse(Partition(H,32)));
+end function;
+
+// BYTES IN THE DIGEST
+function BytesInDigest(H)
+	return &cat(Reverse(Partition(H,8)));
+end function;
+
+//----------------------Main function for RIPEMD-160-----------------------------
+// The final Hash Function
+// INPUT:	- X: the message, in form of a hexadecimal number
+// OUTPUT:	- the hash of X, i.e. a hexadecimal number in form of string
+function Ripemd160(X)	
+	// Padding
+	X := Padding160(X);
+	
+	//define the initial values h0,..h4 used during the hash generation
+	//this are hexadecimal value that are directly converted into integer	
+	h0 := "67452301";
+	h1 := "EFCDAB89";
+	h2 := "98BADCFE";
+	h3 := "10325476";
+	h4 := "C3D2E1F0";
+	H := [h0,h1,h2,h3,h4];
+	H := [HexToBin(hi): hi in H];
+	
+	t := #X;
+	for i in [0..t-1] do
+		H := MainCycle(H,X,i);
+		H := Partition(BytesInWord(&cat(H)),32); 
+	end for;
+	
+	return BinToHex(&cat(H));
+end function;
+
+//######################################################################################################
+
+// 	[########] ECDSA ALGORITHM [########]
+
+
+//	[###] INTRODUCTION NOTES [###]
+/*	The aim of this Magma program is to emulate the ECDSA used in generation of a Bitcoin Adress. The algorithm is the same as from lectures.
+	Recall from the lectures that
+	(p, a, b) are parameters that uniquely identify the curve.
+		p is the order of the finite field over which the elemnt (x,y) are defined;
+		(a,b) are parameters of the equation of the curve
+	N is private key, where N can be any number (for the purpose of this project, N should be the test vector).
+	(g, g^N) is the public key.
+		g ia a point of the curve, i.e. a fixed couple (x,y);
+		g^N is simply the group operation iterated N times on g.
+
+	The parameters used in Bitcoin adress generation are those of the curve secp256k1.
+//	[###] PARAMETERS [###]
+	Here we collect the parameters used by our algorithms
+	--->IMPORTANT<--- As of now, we represent points on a elliptic curve as sequence [X,Y] of 2 coordinates in GF(p) and NOT in the set of integers.
+*/
+
+p := 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F; 
+
+Fp := GF(p); // Finite Field over which our curve is defined
+
+a := 0; // first equation parameter of the curve
+
+b := 7; // second equation parameter of the curve
+
+g_comp	 := 0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798; // generator point of the curve used as public key
+
+g_uncomp := [0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798, 0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8];		// see introduction notes for compressed/uncompressed g
+
+gen_point := [GF(p)!g_uncomp[1], GF(p)!g_uncomp[2]];	// I cast the type of g to couples in Zp
+
+ord_g := 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141;
+
+secp256k1 := [p,a,b]; // our curve
+
+
+//	[###] ADDITION FUNCTION [###]
+
+/*	ECAddition: This is a algorithm used to compute the group addition among 2 points of an elliptic [p,a,b]
+	The INPUT of the function are
+		i) ElCurve, that is a squence [p,a,b] that identifies our curve.
+		ii) P1, point of a curve, written as a couple in GF(p).
+		iii) P2, point of a curve, written as a couple in GF(p).
+	The OUTPUT of the function is
+		i) P3 = P1+P2, written as a couple.
+	NOTE1: The function doesn't check wether A,B are effectively in the curve, nor does it check if we have to use the 0 element of the curve. Those are all ugly cases the curve secp256k1 should always avoid.
+	NOTE2: This algorithm only cover the standard cases for addition. Curve secp256k1 should avoid the other. You can see what you should do in the other cases in any math book about Elliptic Curves.
+*/
+function ECAddition(ElCurve, P1, P2)
+P3 := [];			// P3 is P1+P2
+
+if P1 ne P2 then 		// case where P1 and P2 are different points
+	if P1[1] eq P2[1] then	// this case should never happen, given that g is a generator
+		error "We are adding point to the 0 element of the curve";
+	end if;
+
+	angcoeff := (P2[2]-P1[2]) * (P2[1]-P1[1])^(-1); // angular coefficient of the line passing throug P1 and P2
+end if;
+
+if P1 eq P2 then		// case where P1 and P2 are the same point and I am drwaing the tangent line
+	if P1[2] eq 0 then	// yet again, this case shoul never happen
+		error P1,"We are writing a tangent parallel to the y axis";
+	end if;
+
+	angcoeff := (3*(P1[1]^2)+ElCurve[2]) * (2*P1[2])^(-1);
+end if;
+// the formulas for the point P3 can be found on any text on Elliptic Curves
+P3[1] := angcoeff^2-P1[1]-P2[1];
+P3[2] := - (angcoeff*(P3[1] - P1[1]) + P1[2]);
+return P3;
+end function;
+
+//	[###] POWER FUNCTION [###]
+
+//	Note that in some textbook, the power g^N is actually written as Ng. If you are confused, they mean the very same thing.
+
+/*	ECstandardPower: This algorithm computes the power g^N of a point g.
+	The INPUT of the function are
+		g, point of an elliptic curve (we assume the curve is already defined when calling ECAddition)
+		N, power of g we have to calculate
+	The OUTPUT of the function is 
+		G = g^N, the desired power of g
+	REMARK: The table G[i]is always the same. As such, it could be computed once and for all outside of the function and save time when checking the function ECDSA on multiple test vectors
+*/
+G:=[]; //first I create a lookup table for exponents powers of 2. We have that G[i] = g^(2^i). This is actually very fast.
+G[1] := gen_point;
+for i in [2..256] do	// 2^8 = 256, hence we have to stop at index 8
+	G[i]:=ECAddition(secp256k1, G[i-1], G[i-1]);
+end for;
+function ECstandardPower(g, N)
+S := Intseq(N,2); //Binary representation of a the number N
+CurrPower := [0,0]; // This is the ugliest initialization I have ever written. It's the current "iteration" of g^N.
+for i in [1..#S] do
+	if S[i] eq 1 then
+		if CurrPower eq [0,0] then
+			CurrPower := G[i]; //this is ugly code and it's the price I pay for not having a 0 point on a EC
+		else
+			CurrPower := ECAddition(secp256k1, CurrPower, G[i]);
+		end if;
+	end if;
+end for;
+return CurrPower;
+end function;
+
+//	-------------Main function for ECDSA-------------------
+//
+//	ECDSA: here we write our main function, where we wrap up everything, cast objects to the proper field, and calculate ECDSA
+//	The INPUT of the function is
+//		PriKey, private key, written as an integer
+//	The OUTPUT of the function is
+//		PubKey, public key, written as a string of hexadecimals
+
+function ECDSA(PriKey)
+	PriKey := StringToInteger(PriKey,16);
+	PubKey := ECstandardPower(gen_point,PriKey mod ord_g);	// I compute the private key (as a couple)
+	PubKey := [Integers()!PubKey[1], Integers()!PubKey[2]];	// I cast the type from Zp to integers
+
+	//block of 0os
+	block1 := ""; block2:="";
+	for i in [1..(64 - #IntegerToString(PubKey[1],16))] do block1 := block1 cat "0"; end for;
+	for i in [1..(64 - #IntegerToString(PubKey[2],16))] do block2 := block2 cat "0"; end for;
+	return "04" cat block1 cat IntegerToString(PubKey[1],16) cat block2 cat IntegerToString(PubKey[2],16);
+end function;
+
+
+//########################################################################################################################
+
+//[########] Base58 ENCODING FUNCTION [########]
+
+//this function calculates "ret" performing base58check encoding on "S"
+//INPUT: S: an hexadecimal number, i.e. it's actually a string 
+//example: S:="00010966776006953D5567439E5E39F86A0D273BEED61967F6"
+//OUTPUT: ret: also a string
+//example base58check(S)->"16UwLL9Risc3QfPqBUvKofHmBQ7wMtjvM"
+
+
+function base58check(S)
+//Base58 symbol chart
+SC:=["1","2","3","4","5","6","7","8","9","A","B","C","D","E","F",
+"G","H","J","K","L","M","N","P","Q","R","S","T","U","V","W",
+"X","Y","Z","a","b","c","d","e","f","g","h","i","j","k","m",
+"n","o","p","q","r","s","t","u","v","w","x","y","z"];
+
+//S into decimal 
+SasInteger:=StringToInteger(S,16);
+
+//initialize stuff for the while loop
+next:=SasInteger;
+R:=[];
+
+//during each iteration calculate next mod 58,
+//append corresponding symbol to R,
+//calculate next div 58 for the following iteration
+while (next ne 0) do
+	k:= next mod 58;
+	sym:=SC[k+1];
+	R:= Append(R,sym);
+	next:= next div 58;
+end while;
+
+// leading null bytes are treated as 1 in base 58. Note that we lost informations on leading 0 when doing StringToInteger,so we have to manually add them.
+// here the index i counts the number of 0s of the initial string S. Note that the number of 1s in the corresponding base58 is half this i, rounded down.
+i := 0;
+while S[i+1] eq "0" do
+	i := i+1;
+end while;
+for j in [1..(i div 2)] do
+	R:=Append(R,"1");
+end for;
+R:=Reverse(R);
+
+//R is a sequence of strings, turn it into the string ret
+ret:="";
+for i in [1..#R] do
+	ret:= ret cat R[i];
+end for;
+
+return ret;
+end function;
+
+//####################################################################################################################
+
+//[########] MAIN FUNCTION AdGen [########]
+
+//This function allows to generate a Bitcoin address passing as input a Private Key in hexadecimal representation
+function AdGen(Pkey)
+	address := ECDSA(Pkey);
+	address := sha(address);
+	extended_ripemd := "00" cat Ripemd160(address);
+	address := sha(extended_ripemd);
+	address := sha(address);
+	address_checksum := address[1..8];
+	extended_ripemd := extended_ripemd cat address_checksum;
+	address := base58check(extended_ripemd);
+	return address;
+end function;
+
